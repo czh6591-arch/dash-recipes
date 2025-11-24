@@ -4,6 +4,10 @@ import dash_html_components as html
 import dash_core_components as dcc
 import plotly.graph_objs as go
 import json
+import os
+
+# 持久化存储文件路径
+STORAGE_FILE = 'chart_state.json'
 
 app = dash.Dash()
 
@@ -13,6 +17,21 @@ selected_chart = None
 filter_state = {}
 callback_history = []
 MAX_HISTORY = 5  # 用于检测循环依赖的历史记录长度
+
+# 加载持久化状态
+def load_state():
+    if os.path.exists(STORAGE_FILE):
+        try:
+            with open(STORAGE_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {'charts': [], 'selected_chart': None, 'filter_state': {}}
+
+# 保存持久化状态
+def save_state(state):
+    with open(STORAGE_FILE, 'w') as f:
+        json.dump(state, f)
 
 app.layout = html.Div([
     # 图表管理操作区域
@@ -26,7 +45,7 @@ app.layout = html.Div([
     html.Div(id='chart-container'),
     
     # 隐藏的存储组件，用于跟踪图表状态
-    dcc.Store(id='chart-state', data={'charts': [], 'selected_chart': None, 'filter_state': {}}),
+    dcc.Store(id='chart-state', data=load_state()),
     
     # 隐藏的空图表，用于获取默认的图表配置
     html.Div(dcc.Graph(id='empty-graph', figure={'data': []}), style={'display': 'none'})
@@ -72,6 +91,9 @@ def add_chart(n_clicks, current_state):
     # 更新筛选状态
     new_state['filter_state'][chart_id] = {'x_range': None, 'y_range': None}
     
+    # 保存状态到文件
+    save_state(new_state)
+    
     return new_state
 
 # 删除当前选中图表回调
@@ -96,6 +118,9 @@ def delete_chart(n_clicks, current_state):
         
     # 重置选中图表
     new_state['selected_chart'] = None if not new_state['charts'] else new_state['charts'][0]
+    
+    # 保存状态到文件
+    save_state(new_state)
     
     return new_state
 
@@ -182,6 +207,9 @@ def handle_chart_selection(selected_data_list, current_state):
             if chart_id != trigger_id:
                 new_state['filter_state'][chart_id] = {'x_range': x_range, 'y_range': None}
     
+    # 保存状态到文件
+    save_state(new_state)
+    
     return new_state
 
 # 处理图表点击回调（用于选择图表）
@@ -202,6 +230,9 @@ def handle_chart_click(click_data_list, current_state):
     # 更新选中图表
     new_state = current_state.copy()
     new_state['selected_chart'] = trigger_id
+    
+    # 保存状态到文件
+    save_state(new_state)
     
     return new_state
 
